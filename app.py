@@ -1,6 +1,7 @@
 # app.py
 import json
 import os
+
 import cv2
 import face_recognition
 import pymongo
@@ -12,6 +13,7 @@ myclient = pymongo.MongoClient("mongodb://localhost:27017/")
 mydb = myclient["mydatabase"]
 userTable = mydb["user"]
 imageTable = mydb["images"]
+complainTable = mydb["complain"]
 # dblist = myclient.list_database_names()
 # mydict = {"name": "John", "address": "Highway 37"}
 x = userTable.find_one({"name": "John"})
@@ -95,6 +97,17 @@ def register():
         return request.data, 200
 
 
+@app.route('/complaints', methods=['POST'])
+def get_my_complaints():
+    data = request.get_json()
+    fetched_images = imageTable.find({"uploaderEmail": data["user"]})
+    json_docs = []
+    for doc in fetched_images:
+        json_doc = json.dumps(doc, default=json_util.default)
+        json_docs.append(json_doc)
+    return {"images": json_docs}, 200
+
+
 @app.route('/getresultimages/<images>', methods=['GET'])
 def getImages(images):
     fetched_images = imageTable.find({})
@@ -104,14 +117,15 @@ def getImages(images):
         image1 = face_recognition.load_image_file("static/uploads/" + doc["imageName"])
         image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
         image1encoding = face_recognition.face_encodings(image1)
-        image1encoding = image1encoding[0]
-        image2 = face_recognition.load_image_file("static/uploads/Prashant1.jpg")
-        image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
-        image2encoding = face_recognition.face_encodings(image2)[0]
-        result = face_recognition.compare_faces([image1encoding], image2encoding)
-        if result[0]:
-            json_doc = json.dumps(doc, default=json_util.default)
-            json_docs.append(json_doc)
+        if len(image1encoding) > 0:
+            image1encoding = image1encoding[0]
+            image2 = face_recognition.load_image_file("static/uploads/" + images)
+            image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
+            image2encoding = face_recognition.face_encodings(image2)[0]
+            result = face_recognition.compare_faces([image1encoding], image2encoding)
+            if result[0]:
+                json_doc = json.dumps(doc, default=json_util.default)
+                json_docs.append(json_doc)
 
     return {"images": json_docs}, 200
 
